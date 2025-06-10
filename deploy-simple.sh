@@ -29,6 +29,6 @@ gcloud run deploy todo-frontend \
 # Get frontend URL
 FRONTEND_URL=$(gcloud run services describe todo-frontend --platform managed --region us-central1 --format 'value(status.url)')
 
-echo "✅ Deployment completed!"
+echo "Deployment completed!"
 echo "Backend URL: $BACKEND_URL"
 echo "Frontend URL: $FRONTEND_URL" 
