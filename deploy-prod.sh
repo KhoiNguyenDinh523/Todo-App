@@ -1,8 +1,11 @@
 #!/bin/bash
 
-# Environment Variables - Replace these with your actual values
-MONGO_URI="mongodb+srv://nguyen523:nguyen523@knguyencluster.n4jxwgr.mongodb.net/todo_db?retryWrites=true&w=majority"
-JWT_SECRET_KEY="6fK9qP2mY5vR8sB3tW7zXcN1jL4hG0pQdAeIiUuOoVlMnJbZyHxSgTkFwE"
+# Check if environment variables are set
+if [ -z "$MONGO_URI" ] || [ -z "$JWT_SECRET_KEY" ]; then
+    echo "Error: Required environment variables are not set!"
+    echo "Please set MONGO_URI and JWT_SECRET_KEY before running this script"
+    exit 1
+fi
 
 # Deploy Backend
 cd backend
@@ -30,6 +33,6 @@ gcloud run deploy todo-frontend \
 # Get frontend URL
 FRONTEND_URL=$(gcloud run services describe todo-frontend --platform managed --region asia-southeast2 --format 'value(status.url)')
 
-echo "Deployment completed!"
+echo "✅ Deployment completed!"
 echo "Backend URL: $BACKEND_URL"
 echo "Frontend URL: $FRONTEND_URL" 

@@ -6,10 +6,26 @@ from passlib.hash import pbkdf2_sha256
 import os
 from dotenv import load_dotenv
 from bson import ObjectId
+from google.cloud import secretmanager
+import sys
 from models import User, Task, db
 
-# Load environment variables
+# Load environment variables (for local development)
 load_dotenv()
+
+def access_secret_version(secret_id, version_id="latest"):
+    """
+    Access the secret version from Secret Manager.
+    """
+    try:
+        client = secretmanager.SecretManagerServiceClient()
+        name = f"projects/{os.getenv('GOOGLE_CLOUD_PROJECT')}/secrets/{secret_id}/versions/{version_id}"
+        response = client.access_secret_version(request={"name": name})
+        return response.payload.data.decode("UTF-8")
+    except Exception as e:
+        print(f"Error accessing secret {secret_id}: {e}")
+        # Fallback to environment variable if secret access fails
+        return os.getenv(secret_id)
 
 app = Flask(__name__)
 
@@ -17,16 +33,27 @@ app = Flask(__name__)
 CORS(app, resources={
     r"/api/*": {
         "origins": [
-            os.getenv("FRONTEND_LOCAL_URL", "http://localhost:3000"),
-            os.getenv("FRONTEND_PROD_URL")
+            "http://localhost:3000",
+            "https://todo-frontend-619802185199.asia-southeast2.run.app" 
         ],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"]
     }
 })
 
+# Get JWT secret from Secret Manager in production, fallback to .env for local development
+try:
+    jwt_secret = access_secret_version("JWT_SECRET_KEY")
+    print("Successfully retrieved JWT_SECRET_KEY from Secret Manager")
+except Exception as e:
+    print(f"Falling back to environment variable for JWT_SECRET_KEY: {e}")
+    jwt_secret = os.getenv("JWT_SECRET_KEY")
+
+if not jwt_secret:
+    raise ValueError("JWT_SECRET_KEY is not set in either Secret Manager or environment variables")
+
 # JWT Configuration
-app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY") 
+app.config["JWT_SECRET_KEY"] = jwt_secret
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=24)
 jwt = JWTManager(app)
 
@@ -177,7 +204,7 @@ def update_task(task_id):
             "description": data.get("description", task["description"]),
             "completed": data.get("completed", task["completed"]),
             "due_date": datetime.fromisoformat(data["due_date"]) if data.get("due_date") else task.get("due_date"),
-            "updated_at": datetime.utcnow()
+            "updated_at": datetime.now(datetime.timezone.utc)
         }
         
         db.tasks.update_one(
