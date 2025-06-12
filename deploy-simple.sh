@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Load environment variables from backend/.env for local use
+# Load environment variables from backend/.env
 if [ -f backend/.env ]; then
     export $(cat backend/.env | grep -v '^#' | xargs)
 else
@@ -24,6 +24,10 @@ gcloud run deploy todo-backend \
 BACKEND_URL=$(gcloud run services describe todo-backend --platform managed --region asia-southeast2 --format 'value(status.url)')
 echo "Backend deployed at: $BACKEND_URL"
 
+# Create or update frontend production env file
+echo "Updating frontend environment configuration..."
+echo "REACT_APP_API_URL=${BACKEND_URL}/api" > frontend/todolist/.env.production
+
 # Deploy Frontend
 echo "Deploying frontend service..."
 cd ../frontend/todolist
@@ -31,8 +35,7 @@ gcloud run deploy todo-frontend \
   --source . \
   --platform managed \
   --region asia-southeast2 \
-  --allow-unauthenticated \
-  --set-env-vars "REACT_APP_API_URL=${BACKEND_URL}/api"
+  --allow-unauthenticated
 
 # Get frontend URL
 FRONTEND_URL=$(gcloud run services describe todo-frontend --platform managed --region asia-southeast2 --format 'value(status.url)')
@@ -43,4 +46,8 @@ echo "Updating backend CORS configuration..."
 gcloud run services update todo-backend \
   --region asia-southeast2 \
   --set-env-vars "FRONTEND_PROD_URL=${FRONTEND_URL}"
+
+echo "Deployment completed!"
+echo "Backend URL: $BACKEND_URL"
+echo "Frontend URL: $FRONTEND_URL"
 
