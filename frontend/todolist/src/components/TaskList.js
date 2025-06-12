@@ -35,7 +35,6 @@ import {
   Add as AddIcon,
   Search as SearchIcon,
   Logout as LogoutIcon,
-  Sort as SortIcon
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import { debounce } from 'lodash';
@@ -158,7 +157,7 @@ const TaskList = () => {
       <AppBar position="static" color="primary" elevation={0}>
         <Toolbar>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            My Tasks
+            TodoManager
           </Typography>
           <Button color="inherit" onClick={handleLogout} startIcon={<LogoutIcon />}>
             Logout

@@ -3,51 +3,12 @@ from pymongo import MongoClient
 from bson import ObjectId
 import os
 from dotenv import load_dotenv
-from google.cloud import secretmanager
-import json
-import sys
 
-def access_secret_version(secret_id, version_id="latest"):
-    """
-    Access the secret version from Secret Manager.
-    """
-    try:
-        client = secretmanager.SecretManagerServiceClient()
-        name = f"projects/{os.getenv('GOOGLE_CLOUD_PROJECT')}/secrets/{secret_id}/versions/{version_id}"
-        response = client.access_secret_version(request={"name": name})
-        return response.payload.data.decode("UTF-8")
-    except Exception as e:
-        print(f"Error accessing secret {secret_id}: {e}")
-        # Fallback to environment variable if secret access fails
-        return os.getenv(secret_id)
-
-# Load environment variables (for local development)
+# Load environment variables
 load_dotenv()
 
-# Debug: Print current working directory and environment variable
-print(f"Current working directory: {os.getcwd()}", file=sys.stderr)
-print(f"MONGO_URI value: {os.getenv('MONGO_URI')}", file=sys.stderr)
-
-# Get MongoDB URI from Secret Manager in production, fallback to .env for local development
-try:
-    MONGO_URI = access_secret_version("MONGO_URI")
-    print("Successfully retrieved MONGO_URI from Secret Manager")
-except Exception as e:
-    print(f"Falling back to environment variable for MONGO_URI: {e}")
-    MONGO_URI = os.getenv("MONGO_URI")
-
-if not MONGO_URI:
-    raise ValueError("MONGO_URI is not set in either Secret Manager or environment variables")
-
-try:
-    client = MongoClient(MONGO_URI)
-    # Test the connection
-    client.admin.command('ping')
-    print("Successfully connected to MongoDB!", file=sys.stderr)
-except Exception as e:
-    print(f"Error connecting to MongoDB: {str(e)}", file=sys.stderr)
-    raise
-
+MONGO_URI = os.getenv("MONGO_URI")
+client = MongoClient(MONGO_URI)
 db = client.todo_db
 
 # Define collection schemas

@@ -6,54 +6,39 @@ from passlib.hash import pbkdf2_sha256
 import os
 from dotenv import load_dotenv
 from bson import ObjectId
-from google.cloud import secretmanager
-import sys
 from models import User, Task, db
 
-# Load environment variables (for local development)
+# Load environment variables
 load_dotenv()
 
-def access_secret_version(secret_id, version_id="latest"):
-    """
-    Access the secret version from Secret Manager.
-    """
-    try:
-        client = secretmanager.SecretManagerServiceClient()
-        name = f"projects/{os.getenv('GOOGLE_CLOUD_PROJECT')}/secrets/{secret_id}/versions/{version_id}"
-        response = client.access_secret_version(request={"name": name})
-        return response.payload.data.decode("UTF-8")
-    except Exception as e:
-        print(f"Error accessing secret {secret_id}: {e}")
-        # Fallback to environment variable if secret access fails
-        return os.getenv(secret_id)
+# Get environment setting
+ENV = os.getenv("FLASK_ENV", "development")
 
 app = Flask(__name__)
 
-# Configure CORS with specific origins
-CORS(app, resources={
-    r"/api/*": {
-        "origins": [
-            "http://localhost:3000",
-            "https://todo-frontend-619802185199.asia-southeast2.run.app" 
-        ],
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"]
-    }
-})
-
-# Get JWT secret from Secret Manager in production, fallback to .env for local development
-try:
-    jwt_secret = access_secret_version("JWT_SECRET_KEY")
-    print("Successfully retrieved JWT_SECRET_KEY from Secret Manager")
-except Exception as e:
-    print(f"Falling back to environment variable for JWT_SECRET_KEY: {e}")
-    jwt_secret = os.getenv("JWT_SECRET_KEY")
-
-if not jwt_secret:
-    raise ValueError("JWT_SECRET_KEY is not set in either Secret Manager or environment variables")
+# Configure CORS based on environment
+if ENV == "development":
+    # In development, allow all origins and set debug to True
+    CORS(app, resources={
+        r"/*": {
+            "origins": "*",
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"]
+        }
+    })
+    app.debug = True
+else:
+    # In production, only allow specific origin
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": [os.getenv("FRONTEND_PROD_URL")],
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"]
+        }
+    })
 
 # JWT Configuration
-app.config["JWT_SECRET_KEY"] = jwt_secret
+app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=24)
 jwt = JWTManager(app)
 
@@ -204,7 +189,7 @@ def update_task(task_id):
             "description": data.get("description", task["description"]),
             "completed": data.get("completed", task["completed"]),
             "due_date": datetime.fromisoformat(data["due_date"]) if data.get("due_date") else task.get("due_date"),
-            "updated_at": datetime.now(datetime.timezone.utc)
+            "updated_at": datetime.utcnow()
         }
         
         db.tasks.update_one(
@@ -238,5 +223,10 @@ def health_check():
     return jsonify({"status": "healthy"}), 200
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8080))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    if ENV == "development":
+        # Development server
+        app.run(host="0.0.0.0", port=5000, debug=True)
+    else:
+        # Production server
+        port = int(os.getenv("PORT", 8080))
+        app.run(host="0.0.0.0", port=port, debug=False)
