@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, abort
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, get_jwt_identity, jwt_required
 from datetime import timedelta, datetime
@@ -8,8 +8,14 @@ from dotenv import load_dotenv
 from bson import ObjectId
 from models import User, Task, db
 
-# Load environment variables
+# Load environment variables from .env file (if it exists)
 load_dotenv()
+
+# Required environment variables
+required_vars = ['MONGO_URI', 'JWT_SECRET_KEY']
+missing_vars = [var for var in required_vars if not os.getenv(var)]
+if missing_vars:
+    raise RuntimeError(f"Missing required environment variables: {', '.join(missing_vars)}")
 
 # Get environment setting
 ENV = os.getenv("FLASK_ENV", "development")
@@ -28,17 +34,26 @@ if ENV == "development":
     })
     app.debug = True
 else:
-    # In production, only allow specific origin
+    # In production, get the frontend URL from environment variable
+    frontend_url = os.getenv('FRONTEND_PROD_URL')
+    if not frontend_url:
+        print("Warning: FRONTEND_PROD_URL not set in production environment")
+        # Fallback to allow any origin if FRONTEND_PROD_URL is not set
+        frontend_url = "*"
+    
     CORS(app, resources={
         r"/api/*": {
-            "origins": [os.getenv("FRONTEND_PROD_URL")],
+            "origins": [frontend_url],
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization"]
         }
     })
 
 # JWT Configuration
-app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
+jwt_secret = os.getenv("JWT_SECRET_KEY")
+if not jwt_secret:
+    raise RuntimeError("JWT_SECRET_KEY must be set")
+app.config["JWT_SECRET_KEY"] = jwt_secret
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=24)
 jwt = JWTManager(app)
 
@@ -220,7 +235,16 @@ def delete_task(task_id):
 
 @app.route("/api/health", methods=["GET"])
 def health_check():
-    return jsonify({"status": "healthy"}), 200
+    config_status = {
+        "mongo_uri_set": bool(os.getenv("MONGO_URI")),
+        "jwt_secret_set": bool(os.getenv("JWT_SECRET_KEY")),
+        "environment": ENV,
+        "frontend_url": os.getenv("FRONTEND_PROD_URL", "not set (using development CORS)"),
+    }
+    return jsonify({
+        "status": "healthy",
+        "configuration": config_status
+    }), 200
 
 if __name__ == "__main__":
     if ENV == "development":
