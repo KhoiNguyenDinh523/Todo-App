@@ -24,30 +24,38 @@ app = Flask(__name__)
 
 # Configure CORS based on environment
 if ENV == "development":
-    # In development, allow all origins and set debug to True
-    CORS(app, resources={
-        r"/*": {
-            "origins": "*",
-            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"]
-        }
-    })
-    app.debug = True
+    CORS(app)  # Allow all origins in development
 else:
-    # In production, get the frontend URL from environment variable
     frontend_url = os.getenv('FRONTEND_PROD_URL')
     if not frontend_url:
         print("Warning: FRONTEND_PROD_URL not set in production environment")
-        # Fallback to allow any origin if FRONTEND_PROD_URL is not set
         frontend_url = "*"
     
-    CORS(app, resources={
-        r"/api/*": {
-            "origins": [frontend_url],
-            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"]
-        }
-    })
+    CORS(app, 
+         resources={r"/api/*": {
+             "origins": [frontend_url],
+             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+             "allow_headers": ["Content-Type", "Authorization"],
+             "expose_headers": ["Content-Type", "Authorization"],
+             "supports_credentials": True,
+             "max_age": 600
+         }},
+         allow_headers=["Content-Type", "Authorization"],
+         expose_headers=["Content-Type", "Authorization"],
+         supports_credentials=True
+    )
+
+# Enable CORS for OPTIONS requests (preflight)
+@app.after_request
+def after_request(response):
+    if ENV != "development":
+        frontend_url = os.getenv('FRONTEND_PROD_URL')
+        if frontend_url:
+            response.headers.add('Access-Control-Allow-Origin', frontend_url)
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    return response
 
 # JWT Configuration
 jwt_secret = os.getenv("JWT_SECRET_KEY")

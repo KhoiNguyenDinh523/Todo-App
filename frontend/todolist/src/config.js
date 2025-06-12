@@ -1,12 +1,25 @@
-// Default to local development URL if REACT_APP_API_URL is not set
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+// Check if we have the API URL from environment variables
+const API_URL = process.env.REACT_APP_API_URL;
+
+if (!API_URL) {
+    console.error('REACT_APP_API_URL is not set in environment variables');
+}
 
 // Remove any trailing slashes for consistency
-const normalizedApiUrl = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
+const normalizedApiUrl = API_URL?.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
+
+// Default fetch options for all API calls
+export const defaultFetchOptions = {
+    credentials: 'include',
+    headers: {
+        'Content-Type': 'application/json',
+    },
+};
 
 export const config = {
     apiUrl: normalizedApiUrl,
-    // Add other configuration values here
+    fetchOptions: defaultFetchOptions,
+    isDevelopment: process.env.NODE_ENV === 'development',
 };
 
 // Helper function to construct API endpoints
